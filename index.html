@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mystery Wheel — Presentkort</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0a0d12; --bg-2:#0f1419;
+  --card:#131820; --card-2:#1a2029; --card-3:#222a36;
+  --border:#1f2733; --border-2:#2a3341;
+  --text:#e8ecf1; --text-2:#8b95a5; --text-3:#5a6372;
+  --gold:#f0b90b; --gold-2:#ffd83d;
+  --green:#00c853; --green-2:#00a844;
+  --paypal:#0070ba; --paypal-2:#003087;
+  --swish:#00c2a8;
+  --danger:#ff3b30;
+  --radius:16px; --radius-lg:22px;
+  --shadow:0 8px 32px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;padding:16px;line-height:1.5;background:radial-gradient(circle at 50% -20%, #141b26 0%, var(--bg) 55%)}
+.wrap{max-width:600px;margin:0 auto;padding-bottom:100px}
+
+/* Header */
+.h{text-align:center;padding:20px 0 24px}
+.h .brand{display:inline-flex;align-items:center;gap:10px;margin-bottom:8px}
+.h .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#e09e00);display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:18px;box-shadow:0 4px 16px rgba(240,185,11,.25)}
+.h h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.h p{color:var(--text-2);font-size:12px;margin-top:4px;letter-spacing:.02em}
+.h .badge{display:inline-block;margin-top:12px;padding:6px 14px;background:var(--card);border:1px solid var(--border);border-radius:999px;font-size:10px;color:var(--text-2);font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+
+/* Wheel */
+.wheel-box{position:relative;background:var(--card);border-radius:var(--radius-lg);padding:24px 16px 20px;border:1px solid var(--border);margin-bottom:16px;text-align:center;box-shadow:var(--shadow)}
+.wheel-inner{position:relative;max-width:380px;margin:0 auto}
+#wheelCanvas{width:100%;aspect-ratio:1;border-radius:50%;display:block;box-shadow:0 0 0 8px #0d1218, 0 0 0 10px var(--border-2), 0 24px 48px rgba(0,0,0,.6)}
+.pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:26px solid var(--gold);z-index:5;filter:drop-shadow(0 4px 8px rgba(240,185,11,.4))}
+.spin-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:104px;height:104px;border-radius:50%;background:linear-gradient(160deg,#fff,#d8dde5);color:#000;border:4px solid #0a0d12;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.7), inset 0 -2px 4px rgba(0,0,0,.1);z-index:4;letter-spacing:.02em;transition:transform .15s, box-shadow .15s}
+.spin-btn:not(:disabled):hover{transform:translate(-50%,-50%) scale(1.04)}
+.spin-btn:disabled{background:linear-gradient(160deg,#2a3341,#1a2029);color:#5a6372;cursor:not-allowed}
+.locked-overlay{position:absolute;inset:0;border-radius:var(--radius);background:rgba(10,13,18,.94);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:6;text-align:center;padding:24px;transition:opacity .3s}
+.locked-overlay.hidden{opacity:0;pointer-events:none}
+.locked-overlay .lock-icon{font-size:32px;margin-bottom:12px;opacity:.9}
+.locked-overlay h3{font-size:16px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+.locked-overlay p{font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:16px}
+.locked-overlay .cta-pill{background:linear-gradient(135deg,var(--gold),#e09e00);color:#000;padding:10px 22px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.02em;box-shadow:0 4px 16px rgba(240,185,11,.35)}
+
+/* Result banner */
+.result-banner{background:linear-gradient(135deg,#1a2029,#131820);border:1px solid var(--gold);border-radius:var(--radius);padding:18px;text-align:center;margin-bottom:16px;display:none;position:relative;overflow:hidden}
+.result-banner::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.result-banner.show{display:block;animation:reveal .5s ease}
+@keyframes reveal{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.result-banner .label{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.result-banner #resultText{font-size:20px;font-weight:800;margin:6px 0;letter-spacing:-.01em}
+.result-banner #resultDesc{font-size:12px;color:var(--text-2)}
+
+/* Preview */
+.preview{background:var(--card);border-radius:var(--radius-lg);border:1px solid var(--border);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow)}
+.preview-tabs{display:flex;background:var(--bg-2);border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:14px 10px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;color:var(--text-3);letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent;transition:color .15s}
+.tab.active{color:var(--text);border-bottom-color:var(--gold);background:var(--card)}
+.card-stage{position:relative;padding:16px;background:radial-gradient(circle at 30% 20%,#1e2530,#0d1218)}
+canvas.main{width:100%;border-radius:12px;display:block;background:#111;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.scratch{position:absolute;border-radius:6px;touch-action:none;cursor:crosshair;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+#scratchValue{left:7.5%;top:68%;width:32%;height:10%}
+#scratchPin{left:7.5%;top:84%;width:18%;height:7%}
+#scratchCode{left:30%;top:84%;width:36%;height:7%}
+
+/* Price tag */
+.price-tag{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
+.price-tag .price-label{font-size:10px;color:var(--text-3);letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.price-tag .price-value{font-size:26px;font-weight:900;letter-spacing:-.02em;margin-top:2px}
+.price-tag .price-sub{font-size:11px;color:var(--text-2);margin-top:2px}
+.price-tag .price-icon{font-size:26px;opacity:.5}
+
+/* Buttons */
+.btn{width:100%;padding:16px;border-radius:14px;border:0;font-weight:800;font-size:15px;cursor:pointer;letter-spacing:.01em;transition:transform .12s, box-shadow .2s, background .15s;font-family:inherit}
+.btn:not(:disabled):active{transform:scale(.98)}
+.btn:disabled{cursor:not-allowed;opacity:.4}
+.btn-pay{background:linear-gradient(135deg,var(--gold),#e09e00);color:#000;box-shadow:0 8px 24px rgba(240,185,11,.25);font-size:16px}
+.btn-pay:not(:disabled):hover{box-shadow:0 10px 28px rgba(240,185,11,.4)}
+.btn-mystery{background:#fff;color:#000}
+.btn-sec{background:var(--card-2);color:var(--text);border:1px solid var(--border-2)}
+.btn-sec:not(:disabled):hover{background:var(--card-3)}
+.btn-admin{background:var(--card-2);color:var(--text-2);border:1px solid var(--border);font-size:13px;padding:12px}
+.btn-admin:hover{color:var(--text)}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(5,8,12,.92);backdrop-filter:blur(8px);z-index:9998;display:none;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+.modal.open{display:flex}
+.modal-box{background:var(--card);border:1px solid var(--border-2);border-radius:20px;padding:20px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.8);margin:auto}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-head h3{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.modal-close{background:var(--card-2);border:0;color:var(--text-2);padding:8px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-family:inherit}
+.modal-close:hover{color:var(--text)}
+
+/* Payment options */
+.pay-option{border:1px solid var(--border-2);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;background:var(--card-2);transition:all .15s;position:relative}
+.pay-option:hover{border-color:#3a4553}
+.pay-option.active{border-color:var(--gold);background:linear-gradient(135deg,#1e2530,#182018);box-shadow:0 0 0 1px var(--gold) inset}
+.pay-option-head{display:flex;justify-content:space-between;align-items:center}
+.pay-option-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.pay-option-sub{font-size:11px;color:var(--text-2);margin-top:3px}
+.pay-option .check{width:18px;height:18px;border-radius:50%;border:2px solid var(--border-2);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.pay-option.active .check{border-color:var(--gold);background:var(--gold)}
+.pay-option.active .check::after{content:'✓';color:#000;font-size:12px;font-weight:900}
+.qr-box{background:#fff;padding:12px;border-radius:12px;margin:12px auto 0;display:flex;justify-content:center;width:fit-content}
+.qr-box canvas{display:block}
+
+/* Inputs */
+.input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border-2);background:var(--bg-2);color:var(--text);font-family:inherit;font-size:14px;transition:border-color .15s}
+.input:focus{outline:none;border-color:var(--gold)}
+.input::placeholder{color:var(--text-3)}
+
+/* Admin */
+.admin-panel{position:fixed;inset:0;background:var(--bg);z-index:9999;overflow-y:auto;padding:20px;display:none}
+.admin-panel.open{display:block}
+.admin-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;position:sticky;top:0;background:var(--bg);padding:4px 0;z-index:1}
+.admin-head h2{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.admin-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.admin-card h3{font-size:11px;color:var(--text-3);letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-bottom:12px}
+.admin-card .hint{font-size:11px;color:var(--text-2);margin-top:8px;line-height:1.5}
+.admin-card .input + .input{margin-top:8px}
+.admin-card .btn{margin-top:10px;padding:12px;font-size:13px}
+.wheel-item{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wheel-item .wi-info{flex:1;min-width:0}
+.wheel-item .wi-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wheel-item .wi-desc{font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wheel-item .wi-del{background:#2a1215;border:0;color:#ff6b6b;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;flex-shrink:0}
+#adminOrders{max-height:280px;overflow-y:auto;font-size:12px;background:var(--bg-2);border-radius:8px;padding:10px;color:var(--text-2)}
+#adminOrders .order{padding:8px 0;border-bottom:1px solid var(--border)}
+#adminOrders .order:last-child{border:0}
+#adminOrders .order b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="h">
+    <div class="brand">
+      <div class="brand-mark">M</div>
+      <h1>Mystery Wheel</h1>
+    </div>
+    <p>Presentkort som i butik — Steam, PlayStation, Xbox, Apple, Roblox</p>
+    <div class="badge">$50 per spinn · 100% slumpmässigt</div>
+  </div>
+
+  <!-- WHEEL -->
+  <div class="wheel-box" id="wheelBox">
+    <div class="wheel-inner">
+      <div class="pointer"></div>
+      <canvas id="wheelCanvas" width="600" height="600"></canvas>
+      <button id="spinBtn" class="spin-btn" disabled>LÅST</button>
+      <div id="wheelLock" class="locked-overlay">
+        <div class="lock-icon">🔒</div>
+        <h3>$50 per spinn</h3>
+        <p>Betala först för att låsa upp hjulet.<br>Du kan inte välja pris — allt är slumpmässigt.</p>
+        <div class="cta-pill">BETALA $50</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="resultBanner" class="result-banner">
+    <div class="label">Du vann ett presentkort</div>
+    <div id="resultText">—</div>
+    <div id="resultDesc">—</div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview" id="previewBox" style="display:none">
+    <div class="preview-tabs">
+      <div class="tab active" id="tabFront">Framsida</div>
+      <div class="tab" id="tabBack">Baksida — kod & PIN</div>
+    </div>
+    <div class="card-stage">
+      <canvas id="main" class="main" width="1600" height="1000"></canvas>
+      <canvas id="mainBack" class="main" width="1600" height="1000" style="display:none"></canvas>
+      <canvas id="bar" width="700" height="160" style="display:none"></canvas>
+      <canvas id="scratchValue" class="scratch" width="400" height="120"></canvas>
+      <canvas id="scratchPin" class="scratch" width="200" height="80"></canvas>
+      <canvas id="scratchCode" class="scratch" width="400" height="100"></canvas>
+    </div>
+  </div>
+
+  <!-- PRICE -->
+  <div class="price-tag">
+    <div>
+      <div class="price-label">Pris per spinn</div>
+      <div class="price-value">$<span id="priceValue">50</span></div>
+      <div class="price-sub">Riktigt presentkort · skrapa fram kod</div>
+    </div>
+    <div class="price-icon">🎁</div>
+  </div>
+
+  <!-- ACTIONS -->
+  <button class="btn btn-pay" id="payBtn">💳 Betala $50 — lås upp hjulet</button>
+  <button class="btn btn-mystery" id="newSpinBtn" style="display:none;margin-top:10px">🎰 Köp ny spinn — $50</button>
+  <div class="btn-row">
+    <button class="btn btn-sec" id="dlFront" disabled>⬇︎ Framsida</button>
+    <button class="btn btn-sec" id="dlBack" disabled>⬇︎ Baksida</button>
+  </div>
+
+  <button class="btn btn-admin" id="openAdmin" style="margin-top:20px">⚙︎ Admin</button>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal" id="payModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Betala $50</h3>
+      <button class="modal-close" id="closePay">✕</button>
+    </div>
+
+    <div class="price-tag" style="margin-bottom:14px">
+      <div>
+        <div class="price-label">Mystery Wheel — presentkort</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Slumpmässigt kort som i butik</div>
+      </div>
+      <div style="font-weight:900;font-size:20px">$50</div>
+    </div>
+
+    <div id="payOptions">
+      <!-- PAYPAL -->
+      <div class="pay-option" data-method="paypal">
+        <div class="pay-option-head">
+          <div>
+            <div class="pay-option-title">
+              <span style="color:#0070ba;font-weight:900;font-style:italic;letter-spacing:-.5px">Pay</span><span style="color:#003087;font-weight:900;font-style:italic;letter-spacing:-.5px">Pal</span>
+            </div>
+            <div class="pay-option-sub">Betala säkert med PayPal — $50 USD</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+
+      <!-- SWISH -->
+      <div class="pay-option active" data-method="swish">
+        <div class="pay-option-head">
+          <div>
+            <div class="pay-option-title">📱 Swish</div>
+            <div class="pay-option-sub">ca <span id="swishPriceDisplay">525</span> kr · <span id="swishNumberDisplay">070-000 00 00</span></div>
+          </div>
+          <div class="check"></div>
+        </div>
+        <div id="swishQR" class="qr-box"><canvas id="qrCanvas"></canvas></div>
+      </div>
+
+      <!-- DEMO -->
+      <div class="pay-option" data-method="manual">
+        <div class="pay-option-head">
+          <div>
+            <div class="pay-option-title">🧪 Testläge</div>
+            <div class="pay-option-sub">Lås upp utan betalning (demo)</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+
+    <input id="customerEmail" class="input" type="email" placeholder="E-post för kvitto (valfritt)" style="margin-top:10px">
+    <button class="btn btn-pay" id="confirmPay" style="margin-top:12px">✓ Jag har betalat — lås upp</button>
+    <button class="btn btn-sec" id="openPayApp" style="margin-top:8px;display:none">Öppna Swish</button>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="admin-panel" id="adminPanel">
+  <div class="admin-head">
+    <h2>Admin</h2>
+    <button class="modal-close" id="closeAdmin">Stäng</button>
+  </div>
+
+  <div class="admin-card">
+    <h3>Pris per spinn</h3>
+    <input id="adminPrice" class="input" type="number" value="50" placeholder="50">
+    <button class="btn btn-sec" id="savePrice">Spara pris</button>
+    <div class="hint">Visas som $&lt;pris&gt; överallt på sidan.</div>
+  </div>
+
+  <div class="admin-card">
+    <h3>PayPal</h3>
+    <input id="adminPaypalMe" class="input" placeholder="PayPal.me-användarnamn (t.ex. mittnamn)">
+    <input id="adminPaypalEmail" class="input" placeholder="…eller PayPal e-post (t.ex. namn@mail.com)">
+    <button class="btn btn-sec" id="savePaypal">Spara PayPal</button>
+    <div class="hint">Ange <b>antingen</b> PayPal.me-användarnamn <b>eller</b> e-post. Köparen skickas till PayPal med $beloppet förifyllt.</div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Swish</h3>
+    <input id="adminSwishNumber" class="input" placeholder="0701234567">
+    <input id="adminSwishMsg" class="input" placeholder="Meddelande (t.ex. Mystery Wheel $50)">
+    <button class="btn btn-sec" id="saveSwish">Spara Swish</button>
+    <div class="hint">Nummer visas och QR-kod genereras automatiskt.</div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Hjulets priser</h3>
+    <div id="adminWheelList"></div>
+    <button class="btn btn-sec" id="addWheelItem">+ Lägg till nytt pris</button>
+    <button class="btn btn-sec" id="resetWheel" style="background:#2a1215;border-color:#4a1f24;color:#ff8a8a">Återställ till standard</button>
+  </div>
+
+  <div class="admin-card">
+    <h3>Admin-lösenord</h3>
+    <input id="adminPassInput" class="input" type="password" placeholder="Nytt lösenord (min 4 tecken)">
+    <button class="btn btn-sec" id="saveAdminPass">Byt lösenord</button>
+    <div class="hint">Lösenordet visas aldrig i klartext i gränssnittet.</div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Ordrar</h3>
+    <div id="adminOrders">Inga ordrar ännu</div>
+    <button class="btn btn-sec" id="clearOrders" style="background:#2a1215;border-color:#4a1f24;color:#ff8a8a">Rensa ordrar</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const defaultWheel = [
+  {name:'STEAM WALLET 100 KR', icon:'STEAM', type:'steam', color:['#1b2838','#2a475e'], accent:'#66c0f4', curr:'KR', amounts:[100], desc:'Steam presentkort'},
+  {name:'PLAYSTATION STORE 500 KR', icon:'PlayStation', type:'playstation', color:['#003791','#0070cc'], accent:'#fff', curr:'KR', amounts:[500], desc:'PS Store presentkort'},
+  {name:'XBOX GIFT CARD 500 KR', icon:'XBOX', type:'xbox', color:['#107c10','#5dc21e'], accent:'#fff', curr:'KR', amounts:[500], desc:'Xbox presentkort'},
+  {name:'APPLE GIFT CARD 200 KR', icon:'Apple', type:'apple', color:['#f5f5f7','#d2d2d7'], accent:'#000', curr:'KR', amounts:[200], desc:'Apple presentkort'},
+  {name:'GOOGLE PLAY 200 KR', icon:'Google Play', type:'google', color:['#4285f4','#34a853'], accent:'#fff', curr:'KR', amounts:[200], desc:'Google Play presentkort'},
+  {name:'ROBLOX 800 ROBUX', icon:'ROBLOX', type:'robux', color:['#e2231a','#000000'], accent:'#fff', curr:'ROBUX', amounts:[800], desc:'Robux presentkort'},
+  {name:'ROBLOX 10 000 ROBUX', icon:'ROBLOX', type:'robux', color:['#ffd700','#ff8c00'], accent:'#000', curr:'ROBUX', amounts:[10000], desc:'Jackpot — guldkort'},
+  {name:'ISVAKSBAD', icon:'ISVAK', type:'exp', color:['#00bfff','#004466'], accent:'#fff', curr:'UPPLEVELSE', amounts:[1], desc:'Bada isvak'},
+  {name:'CHILI CHALLENGE', icon:'CHILI', type:'exp', color:['#cc0000','#660000'], accent:'#fff', curr:'UPPLEVELSE', amounts:[1], desc:'Ät starkaste chilin'},
+  {name:'MYSTERY BOX', icon:'MYSTERY', type:'exp', color:['#8B4513','#3e1f00'], accent:'#fff', curr:'BOX', amounts:[1], desc:'Låda med överraskning'},
+  {name:'KARAOKE', icon:'KARAOKE', type:'exp', color:['#ff1493','#990066'], accent:'#fff', curr:'UPPLEVELSE', amounts:[1], desc:'Sjung på torget'},
+  {name:'INGENTING', icon:'💩', type:'exp', color:['#222','#000'], accent:'#fff', curr:'INGENTING', amounts:[0], desc:'Ingen vinst'}
+];
+
+let wheelItems = JSON.parse(localStorage.getItem('mystery_wheel_store') || JSON.stringify(defaultWheel));
+let selected = null, amount = 0, codeDigits = '', pin = '';
+let price = parseInt(localStorage.getItem('mystery_price_store') || '50');
+let swishNumber = localStorage.getItem('mystery_swish_num') || '0700000000';
+let swishMsg = localStorage.getItem('mystery_swish_msg') || 'Mystery Wheel';
+let paypalMe = localStorage.getItem('mystery_paypal_me') || '';
+let paypalEmail = localStorage.getItem('mystery_paypal_email') || '';
+let adminPass = localStorage.getItem('mystery_admin_pass') || 'admin123';
+let orders = JSON.parse(localStorage.getItem('mystery_orders_store') || '[]');
+let isPaid = false, currentRotation = 0, showingBack = false;
+let selectedPayMethod = 'swish';
+
+// ===== CANVAS =====
+const main = document.getElementById('main'), ctx = main.getContext('2d');
+const mainBack = document.getElementById('mainBack'), ctxBack = mainBack.getContext('2d');
+const barC = document.getElementById('bar'), barCtx = barC.getContext('2d');
+const wheelCanvas = document.getElementById('wheelCanvas'), wCtx = wheelCanvas.getContext('2d');
+
+// ===== HELPERS =====
+function save() {
+  localStorage.setItem('mystery_wheel_store', JSON.stringify(wheelItems));
+  localStorage.setItem('mystery_price_store', price);
+  localStorage.setItem('mystery_swish_num', swishNumber);
+  localStorage.setItem('mystery_swish_msg', swishMsg);
+  localStorage.setItem('mystery_paypal_me', paypalMe);
+  localStorage.setItem('mystery_paypal_email', paypalEmail);
+}
+function randStr(len) {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < len; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+function randDigits(n) {
+  return Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join('');
+}
+function formatCode(raw) {
+  if (!raw) return '';
+  if (raw.length <= 16) return raw.match(/.{1,4}/g)?.join('-') || raw;
+  return raw.match(/.{1,5}/g)?.join('-') || raw;
+}
+function paypalLink() {
+  // Föredrar PayPal.me om användarnamn finns, annars e-post xclick
+  if (paypalMe) {
+    const clean = paypalMe.replace(/^@/, '').replace(/[^a-zA-Z0-9._-]/g, '');
+    return `https://www.paypal.com/paypalme/${clean}/${price}USD`;
+  }
+  if (paypalEmail) {
+    const params = new URLSearchParams({
+      cmd: '_xclick',
+      business: paypalEmail,
+      item_name: 'Mystery Wheel - Presentkort',
+      amount: String(price),
+      currency_code: 'USD',
+      no_shipping: '1'
+    });
+    return `https://www.paypal.com/cgi-bin/webscr?${params}`;
+  }
+  return null;
+}
+
+// ===== WHEEL =====
+function drawWheel() {
+  const cx = 300, cy = 300, r = 280;
+  wCtx.clearRect(0, 0, 600, 600);
+  const segAngle = (Math.PI * 2) / wheelItems.length;
+
+  wheelItems.forEach((item, i) => {
+    const start = currentRotation + i * segAngle;
+    const end = start + segAngle;
+    wCtx.beginPath();
+    wCtx.moveTo(cx, cy);
+    wCtx.arc(cx, cy, r, start, end);
+    wCtx.closePath();
+    const g = wCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, item.color[1] || item.color[0]);
+    g.addColorStop(1, item.color[0]);
+    wCtx.fillStyle = g;
+    wCtx.fill();
+    wCtx.strokeStyle = 'rgba(0,0,0,.4)';
+    wCtx.lineWidth = 1.5;
+    wCtx.stroke();
+
+    // Text
+    wCtx.save();
+    wCtx.translate(cx, cy);
+    wCtx.rotate(start + segAngle / 2);
+    wCtx.textAlign = 'right';
+    wCtx.textBaseline = 'middle';
+    wCtx.fillStyle = '#fff';
+    wCtx.font = '700 13px -apple-system, sans-serif';
+    wCtx.shadowColor = 'rgba(0,0,0,.9)';
+    wCtx.shadowBlur = 6;
+    let label = item.icon.slice(0, 12);
+    if (label.length > 14) label = label.slice(0, 14);
+    wCtx.fillText(label, r - 20, 0);
+    wCtx.restore();
+  });
+
+  // Center hub
+  wCtx.beginPath();
+  wCtx.arc(cx, cy, 48, 0, Math.PI * 2);
+  wCtx.fillStyle = '#0d1218';
+  wCtx.fill();
+  wCtx.strokeStyle = '#f0b90b';
+  wCtx.lineWidth = 3;
+  wCtx.stroke();
+  wCtx.fillStyle = '#f0b90b';
+  wCtx.font = '900 16px -apple-system, sans-serif';
+  wCtx.textAlign = 'center';
+  wCtx.textBaseline = 'middle';
+  wCtx.fillText('SPIN', cx, cy);
+}
+
+function spinWheel() {
+  if (!isPaid) { openPayModal(); return; }
+  if (document.getElementById('spinBtn').disabled) return;
+  document.getElementById('spinBtn').disabled = true;
+  document.getElementById('spinBtn').textContent = '…';
+
+  const spins = 6 + Math.random() * 5;
+  const finalAngle = Math.random() * Math.PI * 2;
+  const targetRotation = currentRotation + spins * Math.PI * 2 + finalAngle;
+  const duration = 4500;
+  const startTime = performance.now();
+  const startRot = currentRotation;
+
+  function animate(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    currentRotation = startRot + (targetRotation - startRot) * ease;
+    drawWheel();
+    if (t < 1) requestAnimationFrame(animate);
+    else {
+      currentRotation = targetRotation % (Math.PI * 2);
+      drawWheel();
+      finishSpin();
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function finishSpin() {
+  document.getElementById('spinBtn').disabled = false;
+  document.getElementById('spinBtn').textContent = 'SPINNA IGEN';
+
+  const pointerAngle = -Math.PI / 2;
+  let normalized = (pointerAngle - currentRotation) % (Math.PI * 2);
+  if (normalized < 0) normalized += Math.PI * 2;
+  const segAngle = (Math.PI * 2) / wheelItems.length;
+  const index = Math.floor(normalized / segAngle) % wheelItems.length;
+
+  selected = wheelItems[index];
+  amount = selected.amounts[0];
+  codeDigits = (selected.type === 'exp') ? randStr(8) : randStr(12);
+  pin = randDigits(4);
+
+  document.getElementById('resultBanner').classList.add('show');
+  document.getElementById('resultText').textContent = selected.icon + '  ' + selected.name;
+  document.getElementById('resultDesc').textContent = selected.desc;
+  document.getElementById('previewBox').style.display = 'block';
+  drawFront();
+  drawBack();
+  resetAllScratch();
+  document.getElementById('dlFront').disabled = false;
+  document.getElementById('dlBack').disabled = false;
+  document.getElementById('newSpinBtn').style.display = 'block';
+
+  // Save order
+  orders.push({
+    name: selected.name,
+    platform: selected.icon,
+    code: formatCode(codeDigits),
+    date: new Date().toLocaleString('sv-SE')
+  });
+  localStorage.setItem('mystery_orders_store', JSON.stringify(orders));
+
+  isPaid = false;
+  updateLock();
+  setTimeout(() => document.getElementById('previewBox').scrollIntoView({ behavior: 'smooth' }), 400);
+}
+
+// ===== CARD FRONT =====
+function drawFront() {
+  if (!selected) return;
+  const p = selected;
+  ctx.clearRect(0, 0, 1600, 1000);
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(40, 40, 1520, 920, 32); ctx.clip();
+
+  if (p.type === 'steam') {
+    const g = ctx.createLinearGradient(0, 0, 0, 1000);
+    g.addColorStop(0, '#1b2838'); g.addColorStop(.5, '#2a475e'); g.addColorStop(1, '#1b2838');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1600, 1000);
+    ctx.fillStyle = 'rgba(102,192,244,.08)';
+    ctx.beginPath(); ctx.arc(1200, 300, 400, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#66c0f4'; ctx.font = '900 80px -apple-system, sans-serif';
+    ctx.fillText('STEAM', 80, 200);
+    ctx.fillStyle = '#fff'; ctx.font = '400 28px -apple-system, sans-serif';
+    ctx.fillText('WALLET GIFT CARD', 80, 250);
+  } else if (p.type === 'playstation') {
+    const g = ctx.createLinearGradient(0, 0, 1600, 0);
+    g.addColorStop(0, '#003791'); g.addColorStop(1, '#0070cc');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1600, 1000);
+    ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.font = '120px -apple-system, sans-serif';
+    ctx.fillText('△ ○ × □', 80, 400);
+    ctx.fillStyle = '#fff'; ctx.font = '900 64px -apple-system, sans-serif';
+    ctx.fillText('PlayStation', 80, 180);
+    ctx.font = '300 26px -apple-system, sans-serif';
+    ctx.fillText('Store · GIFT CARD', 80, 220);
+  } else if (p.type === 'xbox') {
+    const g = ctx.createLinearGradient(0, 0, 0, 1000);
+    g.addColorStop(0, '#107c10'); g.addColorStop(1, '#0a4d0a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 1600, 1000);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(200, 180, 60, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#107c10'; ctx.font = '900 70px -apple-system, sans-serif';
+    ctx.fillText('X', 172, 203);
+    ctx.fillStyle = '#fff'; ctx.font = '900 64px -apple-system, sans-serif';
+    ctx.fillText('XBOX', 300, 200);
+    ctx.font = '300 24px -apple-system, sans-serif';
+    ctx.fillText('GIFT CARD', 300, 240);
+  } else if (p.type === 'apple') {
+    ctx.fillStyle = '#f5f5f7'; ctx.fillRect(0, 0, 1600, 1000);
+    ctx.fillStyle = '#000'; ctx.font = '900 80px -apple-system, sans-serif';
+    ctx.fillText('\uF8FF', 80, 200);
+    ctx.font = '600 48px -apple-system, sans-serif';
+    ctx.fillText('Apple', 180, 200);
+    ctx.font = '300 22px -apple-system, sans-serif';
+    ctx.fillText('Gift Card', 180, 235);
+    ctx.fillStyle = '#86868b'; ctx.font = '400 18px -apple-system, sans-serif';
+    ctx.fillText('For everything Apple', 80, 300);
+  } else if (p.type === 'google') {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1600, 1000);
+    const colors = ['#4285f4', '#34a853', '#fbbc05', '#ea4335'];
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.beginPath();
+      ctx.moveTo(80 + i * 30, 120); ctx.lineTo(110 + i * 30, 180); ctx.lineTo(80 + i * 30, 180);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#000'; ctx.font = '600 44px -apple-system, sans-serif';
+    ctx.fillText('Google Play', 220, 190);
+  } else if (p.type === 'robux') {
+    if (p.name.includes('JACKPOT') || p.amounts[0] >= 10000) {
+      const g = ctx.createLinearGradient(0, 0, 1600, 1000);
+      g.addColorStop(0, '#ffd700'); g.addColorStop(1, '#ff8c00');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 1600, 1000);
+      ctx.fillStyle = '#000'; ctx.font = '900 70px -apple-system, sans-serif';
+      ctx.fillText('ROBLOX', 80, 180);
+      ctx.font = '900 32px -apple-system, sans-serif';
+      ctx.fillText('10 000 ROBUX — JACKPOT', 80, 230);
+    } else {
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1600, 1000);
+      ctx.fillStyle = '#e2231a'; ctx.fillRect(0,
